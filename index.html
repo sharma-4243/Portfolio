@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaibhav Sharma | Full-Stack Data Portfolio</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#030712',
+                        cardBg: 'rgba(15, 23, 42, 0.65)',
+                        brandCyan: '#06b6d4',
+                        brandBlue: '#3b82f6',
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body { background-color: #030712; color: #f3f4f6; overflow-x: hidden; }
+        .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .text-gradient { 
+            background: linear-gradient(to right, #06b6d4, #3b82f6); 
+            -webkit-background-clip: text; 
+            background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+        }
+    </style>
+</head>
+<body x-data="portfolioEngine()" x-init="bootSystem()">
+
+    <div class="absolute top-20 left-10 w-72 h-72 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+    <div class="absolute top-[40%] right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-[150px] pointer-events-none"></div>
+
+    <script>
+        // ⚠️ REPLACE THESE STRINGS WITH YOUR COPIED SUPABASE API DETAILS
+        const SUPABASE_URL = "https://YOUR_SUPABASE_PROJECT_URL.supabase.co";
+        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_PUBLIC_KEY";
+        
+        let supabaseClient;
+        function portfolioEngine() {
+            return {
+                currentView: 'login-gate', // Views: 'login-gate', 'signup-gate', 'portfolio-space', 'admin-space'
+                isSandboxMode: true,
+                email: '', password: '', name: '', 
+                authError: '', authSuccess: '',
+                contactName: '', contactEmail: '', contactMsg: '', contactStatus: '',
+                adminFeedback: [], totalUsersCount: 4,
+                
+                // Typing text slider logic parameters
+                typingText: 'Data Analyst',
+                titlesArray: ['Data Analyst', 'SQL Developer', 'Power BI Specialist', 'Insight Engineer'],
+                titleIdx: 0,
+
+                bootSystem() {
+                    AOS.init({ duration: 800, once: true });
+                    
+                    // Verify if real deployment keys are configured
+                    if (!SUPABASE_URL.includes("YOUR_SUPABASE")) {
+                        try {
+                            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                            this.isSandboxMode = false;
+                            console.log("🪐 Real cloud database infrastructure linked.");
+                        } catch (e) {
+                            this.isSandboxMode = true;
+                        }
+                    }
+
+                    // Check for existing baseline login sessions
+                    const cachedUser = localStorage.getItem('active-user');
+                    if (cachedUser) {
+                        this.routeSessionUser(cachedUser);
+                    }
+
+                    // Start text rotator loops
+                    setInterval(() => {
+                        this.titleIdx = (this.titleIdx + 1) % this.titlesArray.length;
+                        this.typingText = this.titlesArray[this.titleIdx];
+                    }, 2500);
+                },
+                
+                async processSignup() {
+                    this.authError = ''; this.authSuccess = '';
+                    
+                    if (this.isSandboxMode) {
+                        localStorage.setItem(`sim-${this.email}`, JSON.stringify({ name: this.name, email: this.email, password: this.password }));
+                        this.authSuccess = "Account generated via Sandbox! Forwarding to login gateway...";
+                        setTimeout(() => { this.currentView = 'login-gate'; this.authSuccess = ''; }, 1200);
+                        return;
+                    }
+
+                    const { error } = await supabaseClient.auth.signUp({ email: this.email, password: this.password, options: { data: { display_name: this.name } } });
+                    if (error) { this.authError = error.message; return; }
+                    this.authSuccess = "Account generated! Forwarding to verification screen...";
+                    setTimeout(() => { this.currentView = 'login-gate'; this.authSuccess = ''; }, 1500);
+                },
+
+                async processLogin() {
+                    this.authError = '';
+                    
+                    // Allow admin bypass access keys in sandbox mode
+                    if (this.email === 'admin@analytics.com' && this.password === 'vaibhav2026') {
+                        localStorage.setItem('active-user', this.email);
+                        this.routeSessionUser(this.email);
+                        return;
+                    }
+
+                    if (this.isSandboxMode) {
+                        const localRecord = localStorage.getItem(`sim-${this.email}`);
+                        if (localRecord) {
+                            const userObj = JSON.parse(localRecord);
+                            if (userObj.password === this.password) {
+                                localStorage.setItem('active-user', this.email);
+                                this.routeSessionUser(this.email);
+                                return;
+                            }
+                        }
+                        this.authError = "Invalid credential matrix inside local fallback engine.";
+                        return;
+                    }
+
+                    const { data, error } = await supabaseClient.auth.signInWithPassword({ email: this.email, password: this.password });
+                    if (error) { this.authError = error.message; return; }
+                    
+                    localStorage.setItem('active-user', data.user.email);
+                    this.routeSessionUser(data.user.email);
+                },
+                
+                routeSessionUser(userEmail) {
+                    if (userEmail === 'admin@analytics.com') {
+                        this.currentView = 'admin-space';
+                        setTimeout(() => { this.fetchAdminMetrics(); }, 150);
+                    } else {
+                        this.currentView = 'portfolio-space';
+                        setTimeout(() => { renderCharts(); }, 150);
+                    }
+                },
+
+                async terminateSession() {
+                    if (!this.isSandboxMode) { await supabaseClient.auth.signOut(); }
+                    localStorage.removeItem('active-user');
+                    this.email = ''; this.password = ''; this.name = '';
+                    this.currentView = 'login-gate';
+                },
+
+                async transmitFeedback() {
+                    this.contactStatus = 'sending';
+                    
+                    if (this.isSandboxMode) {
+                        const currentLogs = JSON.parse(localStorage.getItem('sim-messages') || '[]');
+                        currentLogs.push({ id: Date.now(), name: this.contactName, email: this.contactEmail, message: this.contactMsg });
+                        localStorage.setItem('sim-messages', JSON.stringify(currentLogs));
+                        this.contactStatus = 'success';
+                        this.contactName = ''; this.contactEmail = ''; this.contactMsg = '';
+                        return;
+                    }
+
+                    const { error } = await supabaseClient.from('contact_inquiries').insert([
+                        { name: this.contactName, email: this.contactEmail, message: this.contactMsg }
+                    ]);
+                    if (error) { this.contactStatus = 'error'; return; }
+                    this.contactStatus = 'success';
+                    this.contactName = ''; this.contactEmail = ''; this.contactMsg = '';
+                },
+
+                async fetchAdminMetrics() {
+                    if (this.isSandboxMode) {
+                        this.adminFeedback = JSON.parse(localStorage.getItem('sim-messages') || '[{"id":1,"name":"Deloitte HR Team","email":"hr@deloitte.com","message":"Excellent full-stack integration portfolio architecture! Let\'s setup a screening interview next week."}]');
+                        this.totalUsersCount = this.adminFeedback.length + 3;
+                        return;
+                    }
+                    const { data: messages } = await supabaseClient.from('contact_inquiries').select('*').order('created_at', { ascending: false });
+                    this.adminFeedback = messages || [];
+                    this.totalUsersCount = this.adminFeedback.length + 3;
+                }
+            }
+        }
+    </script>
+
+    <div x-show="currentView === 'login-gate'" class="min-h-screen flex items-center justify-center p-4 relative z-50">
+        <div class="glass-panel max-w-md w-full p-8 rounded-3xl space-y-6 shadow-2xl border border-white/10" data-aos="zoom-in">
+            <div class="text-center space-y-2">
+                <div class="h-10 w-10 bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center justify-center mx-auto text-brandCyan text-xl font-bold">V</div>
+                <h1 class="text-2xl font-bold text-white tracking-tight mt-2">Vaibhav's Secure Data Portal</h1>
+                <p class="text-xs text-gray-400">Sign in to evaluate live analytics engines & charts</p>
+            </div>
+            
+            <div class="bg-cyan-500/5 border border-cyan-500/20 rounded-xl p-3.5 text-xs font-mono text-gray-300">
+                <span class="text-brandCyan font-bold">Recruiter Admin Bypass Keys:</span>
+                <div>User: <span class="text-white">admin@analytics.com</span></div>
+                <div>Pass: <span class="text-white">vaibhav2026</span></div>
+            </div>
+
+            <div class="flex items-center justify-center gap-1.5 text-[11px] font-mono text-amber-400/80 bg-amber-500/5 py-1.5 rounded-lg border border-amber-500/10">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                Sandbox Mode Operational (Anti-Freeze Enabled)
+            </div>
+
+            <div x-show="authError" class="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-400 text-center" x-text="authError"></div>
+            
+            <form @submit.prevent="processLogin" class="space-y-4 text-xs font-mono uppercase tracking-wide text-gray-400">
+                <div><label class="block mb-1">User Account</label><input type="email" required x-model="email" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brandCyan font-sans normal-case"></div>
+                <div><label class="block mb-1">Password</label><input type="password" required x-model="password" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brandCyan font-sans normal-case"></div>
+                <button type="submit" class="w-full py-3 bg-gradient-to-r from-brandCyan to-brandBlue text-darkBg font-bold text-sm tracking-wide rounded-xl shadow-lg shadow-cyan-500/10">Authenticate Access Key</button>
+            </form>
+            <p class="text-center text-xs text-gray-500">Want your own user account? <a href="#" @click="currentView = 'signup-gate'" class="text-brandCyan hover:underline">Register custom credentials</a></p>
+        </div>
+    </div>
+
+    <div x-show="currentView === 'signup-gate'" class="min-h-screen flex items-center justify-center p-4 relative z-50" style="display: none;">
+        <div class="glass-panel max-w-md w-full p-8 rounded-3xl space-y-6 shadow-2xl border border-white/10">
+            <h2 class="text-2xl font-bold text-center text-white">Register Testing Credentials</h2>
+            <div x-show="authError" class="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-400 text-center" x-text="authError"></div>
+            <div x-show="authSuccess" class="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400 text-center" x-text="authSuccess"></div>
+            <form @submit.prevent="processSignup" class="space-y-4 text-xs font-mono uppercase text-gray-400">
+                <div><label class="block mb-1">Full Name</label><input type="text" required x-model="name" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brandCyan font-sans normal-case"></div>
+                <div><label class="block mb-1">Email</label><input type="email" required x-model="email" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brandCyan font-sans normal-case"></div>
+                <div><label class="block mb-1">Password</label><input type="password" required x-model="password" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brandCyan font-sans normal-case"></div>
+                <button type="submit" class="w-full py-3 bg-gradient-to-r from-brandCyan to-brandBlue text-darkBg font-bold text-sm tracking-wide rounded-xl">Register Sandbox Profile</button>
+            </form>
+            <p class="text-center text-xs text-gray-500">Back to access terminal? <a href="#" @click="currentView = 'login-gate'" class="text-brandCyan hover:underline">Log in</a></p>
+        </div>
+    </div>
+
+    <div x-show="currentView === 'portfolio-space'" style="display: none;">
+        
+        <nav class="sticky top-0 z-40 w-full bg-[#030712]/80 backdrop-blur-md border-b border-white/5">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+                <div class="font-bold text-xl tracking-tight flex items-center gap-2">
+                    <span class="text-gradient">Vaibhav.Analytics</span>
+                    <span class="text-[10px] font-mono bg-cyan-500/10 border border-cyan-500/20 text-brandCyan px-2 py-0.5 rounded">User Session Verified</span>
+                </div>
+                <div class="hidden md:flex space-x-6 text-sm text-gray-400 font-medium">
+                    <a href="#home" class="hover:text-brandCyan transition-colors">Home</a>
+                    <a href="#about" class="hover:text-brandCyan transition-colors">About</a>
+                    <a href="#skills" class="hover:text-brandCyan transition-colors">Skills</a>
+                    <a href="#featured" class="hover:text-brandCyan transition-colors">Featured Work</a>
+                    <a href="#dashboards" class="hover:text-brandCyan transition-colors">Dashboards</a>
+                    <a href="#contact" class="hover:text-brandCyan transition-colors">Contact</a>
+                </div>
+                <button @click="terminateSession()" class="text-xs font-mono font-bold text-rose-400 bg-rose-500/5 border border-rose-500/10 px-3 py-1.5 rounded-lg hover:bg-rose-500/20 transition-all">Log Out</button>
+            </div>
+        </nav>
+
+        <main class="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+            
+            <section id="home" class="pt-24 pb-16 text-center space-y-6">
+                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-brandCyan text-xs sm:text-sm font-mono uppercase tracking-wider">
+                    <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+                    Ready for Data Analyst Openings & Assignments
+                </div>
+                
+                <h1 class="text-5xl sm:text-7xl font-bold tracking-tight text-white">
+                    Hi, I am <span class="text-gradient">Vaibhav Sharma</span>
+                </h1>
+                
+                <div class="h-10 text-xl sm:text-2xl font-mono text-gray-300">
+                    Aspiring <span class="text-brandCyan underline decoration-brandBlue/30 font-bold" x-text="typingText"></span>
+                </div>
+                
+                <p class="max-w-2xl text-gray-400 text-sm sm:text-base mx-auto leading-relaxed font-sans">
+                    I analyze data and build dashboards using Python, SQL, Excel, and Power BI to generate business insights.
+                </p>
+                
+                <div class="flex flex-wrap justify-center gap-4 pt-4">
+                    <a href="#featured" class="px-6 py-3 bg-gradient-to-r from-brandCyan to-brandBlue text-darkBg font-bold text-sm rounded-xl shadow-lg shadow-cyan-500/10 hover:opacity-90 transform hover:-translate-y-0.5 transition-all">Explore Case Studies</a>
+                    <a href="assets/resume.pdf" download class="px-6 py-3 bg-white/5 border border-white/10 font-medium text-sm text-white rounded-xl hover:bg-white/10 transition-all">Download Resume PDF</a>
+                </div>
+            </section>
+
+            <section id="about" class="py-20 border-t border-white/5" data-aos="fade-up">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    <div class="space-y-4">
+                        <h2 class="text-3xl font-bold text-white tracking-tight">Professional Profile</h2>
+                        <p class="text-gray-400 text-sm leading-relaxed">
+                            I am a highly motivated B.Tech graduate from SRM Institute of Science and Technology. I specialize in structuring clean database tables, verifying data collection pipelines, and crafting dashboards that translate row-level transactions into operational insights.
+                        </p>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+                        <div class="glass-panel p-5 rounded-2xl space-y-2 hover:scale-[1.02] transition-all duration-300">
+                            <span class="text-brandCyan font-bold text-sm block">🎯 Target Framework</span>
+                            <p class="text-gray-400 leading-relaxed">Entry-level analyst roles or engineering internships requiring immediate data prep capabilities.</p>
+                        </div>
+                        <div class="glass-panel p-5 rounded-2xl space-y-2 hover:scale-[1.02] transition-all duration-300">
+                            <span class="text-brandBlue font-bold text-sm block">💡 Competency Map</span>
+                            <p class="text-gray-400 leading-relaxed">Data cleaning optimization, relational mapping layouts, and calculation summaries.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="skills" class="py-20 border-t border-white/5" data-aos="fade-up">
+                <div class="text-center max-w-3xl mx-auto mb-12">
+                    <h2 class="text-3xl font-bold tracking-tight">Technical Stack Matrix</h2>
+                    <div class="h-1 w-16 bg-brandCyan mx-auto rounded-full mt-2"></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto text-xs sm:text-sm">
+                    <div class="glass-panel p-6 rounded-2xl space-y-4">
+                        <div><div class="flex justify-between mb-1"><span class="text-gray-300">SQL Server (Joins, CTE Expressions)</span><span class="text-brandCyan font-mono">90%</span></div><div class="w-full bg-gray-800 h-1.5 rounded-full"><div class="bg-gradient-to-r from-brandCyan to-brandBlue h-full rounded-full" style="width: 90%"></div></div></div>
+                        <div><div class="flex justify-between mb-1"><span class="text-gray-300">Python Programming (Pandas & NumPy)</span><span class="text-brandCyan font-mono">85%</span></div><div class="w-full bg-gray-800 h-1.5 rounded-full"><div class="bg-gradient-to-r from-brandCyan to-brandBlue h-full rounded-full" style="width: 85%"></div></div></div>
+                    </div>
+                    <div class="glass-panel p-6 rounded-2xl space-y-4">
+                        <div><div class="flex justify-between mb-1"><span class="text-gray-300">Power BI (Data Modeling & Measures)</span><span class="text-brandCyan font-mono">80%</span></div><div class="w-full bg-gray-800 h-1.5 rounded-full"><div class="bg-gradient-to-r from-brandCyan to-brandBlue h-full rounded-full" style="width: 80%"></div></div></div>
+                        <div><div class="flex justify-between mb-1"><span class="text-gray-300">Advanced Excel Formulas & Pivots</span><span class="text-brandCyan font-mono">88%</span></div><div class="w-full bg-gray-800 h-1.5 rounded-full"><div class="bg-gradient-to-r from-brandCyan to-brandBlue h-full rounded-full" style="width: 88%"></div></div></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="featured" class="py-20 border-t border-white/5" data-aos="fade-up">
+                <div class="glass-panel rounded-3xl overflow-hidden max-w-4xl mx-auto p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8 hover:border-brandCyan/20 transition-all duration-300">
+                    <div class="space-y-4">
+                        <span class="text-[10px] font-mono font-bold tracking-wider text-brandCyan bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded">Featured Case Study</span>
+                        <h3 class="text-2xl font-bold text-white tracking-tight">Workforce Attrition Dashboard</h3>
+                        <p class="text-sm text-gray-400 leading-relaxed">Cleaned employee history rows across corporate files. Constructed calculations measures in Power BI via DAX configurations to compute turnover metrics across diverse cohorts.</p>
+                        <div class="bg-white/5 p-3 rounded-lg border-l-2 border-brandCyan text-xs italic text-gray-300 leading-relaxed">Isolated 24% attrition concentrations localized inside early sales tiers with under 12 months of operational runtime.</div>
+                    </div>
+                    <div class="bg-slate-950 rounded-xl p-4 border border-white/5 flex flex-col justify-between min-h-[220px]">
+                        <div class="border-b border-white/5 pb-2 text-xs font-mono text-gray-400 flex justify-between items-center"><span>Dashboard Visualization Mock</span><span class="w-1.5 h-1.5 rounded-full bg-cyan-500"></span></div>
+                        <div class="grid grid-cols-2 gap-2 text-center my-auto font-mono text-xs">
+                            <div class="bg-white/5 p-3 rounded border border-white/5"><span class="text-gray-400 block text-[10px]">Headcount</span><span class="font-bold text-sm text-white">1,420</span></div>
+                            <div class="bg-cyan-500/10 p-3 rounded border border-cyan-500/20"><span class="text-gray-400 block text-[10px]">Attrition %</span><span class="font-bold text-sm text-brandCyan">14.2%</span></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="dashboards" class="py-20 border-t border-white/5" data-aos="fade-up">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                    <div class="glass-panel p-6 rounded-2xl border border-white/5">
+                        <h3 class="font-bold font-mono text-xs uppercase text-brandCyan tracking-wider mb-4">Calculated Pipeline Monthly Volume</h3>
+                        <div class="relative w-full h-48"><canvas id="liveBarChart"></canvas></div>
+                    </div>
+                    <div class="glass-panel p-6 rounded-2xl border border-white/5">
+                        <h3 class="font-bold font-mono text-xs uppercase text-brandBlue tracking-wider mb-4">Regional Consumer Metric Distribution</h3>
+                        <div class="relative w-full h-48 flex justify-center"><canvas id="livePieChart"></canvas></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="contact" class="py-20 border-t border-white/5 max-w-2xl mx-auto" data-aos="fade-up">
+                <form @submit.prevent="transmitFeedback" class="glass-panel p-6 sm:p-8 rounded-3xl space-y-4 text-xs font-mono text-gray-400 uppercase">
+                    <h3 class="text-xl font-sans font-bold text-white text-center normal-case mb-2">Submit Full-Stack Inquiry</h3>
+                    
+                    <div x-show="contactStatus === 'success'" class="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-center normal-case font-medium">🎉 Ingestion complete! Message row successfully written straight into the cloud dashboard table.</div>
+                    <div x-show="contactStatus === 'error'" class="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-center normal-case">❌ Network pipeline transaction failure. Confirm row policy metrics inside Supabase.</div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="space-y-1"><label>Name</label><input required type="text" x-model="contactName" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brandCyan font-sans normal-case"></div>
+                        <div class="space-y-1"><label>Email</label><input required type="email" x-model="contactEmail" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brandCyan font-sans normal-case"></div>
+                    </div>
+                    <div class="space-y-1"><label>Message Content Details</label><textarea required rows="4" x-model="contactMsg" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brandCyan font-sans normal-case resize-none"></textarea></div>
+                    
+                    <button type="submit" :disabled="contactStatus === 'sending'" class="px-5 py-3 bg-gradient-to-r from-brandCyan to-brandBlue text-darkBg font-sans font-bold text-sm rounded-xl tracking-wide disabled:opacity-50">
+                        <span x-text="contactStatus === 'sending' ? 'Writing...' : 'Write to Cloud Database'"></span>
+                    </button>
+                </form>
+            </section>
+        </main>
+    </div>
+
+    <div x-show="currentView === 'admin-space'" style="display: none;" class="min-h-screen p-6 max-w-6xl mx-auto space-y-6">
+        <div class="flex justify-between items-center bg-[#0f172a]/60 backdrop-blur-md p-6 rounded-2xl border border-white/5 shadow-xl">
+            <div>
+                <h1 class="text-2xl font-bold text-white tracking-tight">Cloud Database Control Console</h1>
+                <p class="text-xs text-brandCyan font-mono mt-0.5">Live records parsing directly from production table datasets.</p>
+            </div>
+            <button @click="terminateSession()" class="px-4 py-2 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-400 font-mono text-xs rounded-xl font-bold transition-all">Terminate Admin Session</button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs uppercase">
+            <div class="glass-panel p-5 rounded-xl"><span class="text-gray-400 tracking-wide">Operational Accounts Active</span><div class="text-3xl font-bold text-white mt-1" x-text="totalUsersCount"></div></div>
+            <div class="glass-panel p-5 rounded-xl"><span class="text-gray-400 tracking-wide">Database Rows Written</span><div class="text-3xl font-bold text-white mt-1" x-text="adminFeedback.length"></div></div>
+        </div>
+
+        <div class="space-y-3">
+            <h3 class="text-xs font-mono uppercase tracking-wider text-gray-400 px-1">Ingested Consumer Inquiries Grid Table</h3>
+            <div class="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                <template x-for="item in adminFeedback" :key="item.id">
+                    <div class="bg-[#0f172a]/40 p-5 rounded-2xl border border-white/5 space-y-2">
+                        <div class="flex justify-between text-xs font-mono text-gray-400">
+                            <span class="text-white font-medium" x-text="item.name"></span>
+                            <span class="normal-case" x-text="item.email"></span>
+                        </div>
+                        <p class="text-sm text-gray-300 font-sans leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5" x-text="item.message"></p>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <footer class="border-t border-white/5 bg-black/40 py-8 text-center text-xs text-gray-500 font-mono">
+        <p>Built with HTML, Tailwind CSS & Full-Stack Cloud Database Integrity.</p>
+        <p class="text-gray-600 mt-1">© 2026 Vaibhav Sharma. All Rights Reserved.</p>
+    </footer>
+
+    <script>
+        function renderCharts() {
+            const barCtx = document.getElementById('liveBarChart').getContext('2d');
+            new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Sales Ingestion Vol', data: [40, 45, 51, 49, 62, 75],
+                        backgroundColor: 'rgba(6, 182, 212, 0.4)', borderColor: 'rgba(6, 182, 212, 1)', borderWidth: 1.5, borderRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#9ca3af', font: { size: 10 } } }, x: { grid: { color: 'transparent' }, ticks: { color: '#9ca3af', font: { size: 10 } } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            const pieCtx = document.getElementById('livePieChart').getContext('2d');
+            new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['North', 'East', 'South', 'West'],
+                    datasets: [{ data: [26, 32, 24, 18], backgroundColor: ['rgba(6, 182, 212, 0.5)','rgba(59, 130, 246, 0.5)','rgba(168, 85, 247, 0.5)','rgba(244, 63, 94, 0.5)'], borderWidth: 0 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#f3f4f6', font: { size: 10 } } } }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
